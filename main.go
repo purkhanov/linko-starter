@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -17,35 +18,43 @@ import (
 type closeFunc func() error
 
 func initializeLogger(logFile string) (*slog.Logger, closeFunc, error) {
-	close := func() error {
-		return nil
+	handlers := []slog.Handler{
+		slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}),
 	}
+	closers := []closeFunc{}
 
-	debugHandler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})
-
-	if logFile == "" {
-		return slog.New(debugHandler), close, nil
-	}
-
-	file, err := os.OpenFile(logFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open log file: %w", err)
-	}
-
-	bufferedFile := bufio.NewWriterSize(file, 8192)
-	infoHandler := slog.NewTextHandler(bufferedFile, &slog.HandlerOptions{Level: slog.LevelInfo})
-
-	close = func() error {
-		if err := bufferedFile.Flush(); err != nil {
-			return fmt.Errorf("failed to flush log file: %w", err)
+	if logFile != "" {
+		file, err := os.OpenFile(logFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to open log file: %w", err)
 		}
-		if err := file.Close(); err != nil {
-			return fmt.Errorf("failed to close log file: %w", err)
+		bufferedFile := bufio.NewWriterSize(file, 8192)
+		close := func() error {
+			if err := bufferedFile.Flush(); err != nil {
+				return fmt.Errorf("failed to flush log file: %w", err)
+			}
+			if err := file.Close(); err != nil {
+				return fmt.Errorf("failed to close log file: %w", err)
+			}
+			return nil
 		}
-		return nil
+		handlers = append(handlers, slog.NewJSONHandler(bufferedFile, &slog.HandlerOptions{
+			Level: slog.LevelInfo,
+		}))
+		closers = append(closers, close)
 	}
-
-	return slog.New(slog.NewMultiHandler(debugHandler, infoHandler)), close, nil
+	closer := func() error {
+		var errs []error
+		for _, close := range closers {
+			if err := close(); err != nil {
+				errs = append(errs, err)
+			}
+		}
+		return errors.Join(errs...)
+	}
+	return slog.New(slog.NewMultiHandler(handlers...)), closer, nil
 }
 
 func main() {
