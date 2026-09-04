@@ -51,9 +51,10 @@ func (s *server) validatePassword(password, stored string) (bool, error) {
 	if err == bcrypt.ErrMismatchedHashAndPassword {
 		return false, nil
 	}
+
 	if err != nil {
-		s.logger.Error("error validating password", "error", err)
 		return false, err
 	}
+
 	return true, nil
 }
