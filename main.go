@@ -134,7 +134,7 @@ type multiError interface {
 
 func errorAttrs(err error) []slog.Attr {
 	attrs := []slog.Attr{
-		{Key: "mseeage", Value: slog.StringValue(err.Error())},
+		{Key: "message", Value: slog.StringValue(err.Error())},
 	}
 	attrs = append(attrs, linkoerr.Attrs(err)...)
 	if stackErr, ok := errors.AsType[stackTracer](err); ok {
