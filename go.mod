@@ -1,6 +1,6 @@
 module boot.dev/linko
 
-go 1.26
+go 1.27
 
 require (
 	github.com/lmittmann/tint v1.2.0
